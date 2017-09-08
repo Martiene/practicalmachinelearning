@@ -1,0 +1,132 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Martiene"
+date: "7 september 2017"
+output: html_document
+---
+## Executive Summary
+
+The Random Forest Model has the highest accuracy for predicting the manner (classe) in which six young health participants were performing one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl.
+
+The accuracy of Random Forest model in the testing data is 0.993. The expected Out of Sample error is 0.007.
+
+## Background
+
+In this project, I will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. In this report I will describe how we built the model, how I used cross validation, what the expected out of sample error is, and why I made the choices I did. I will also use my prediction model to predict 20 different test cases.
+
+## Load and clean the data
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library(caret)
+library(lattice)
+library(ggplot2)
+library(rpart)
+library(rattle)
+library(RGtk2)
+library(AppliedPredictiveModeling)
+library(randomForest)
+```
+ 
+```{r load data}
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings=c("NA","NaN","#DIV/0!", ""))
+
+```
+
+```{r check dimensions and variables}
+
+dim(training)
+
+```
+
+In the training dataframe I deleted the empty columns and the columns with more than 40% missing data. I also deleted the variables with no meaning.
+
+```{r clean data}
+training.emptycols <- sapply(training, function (x) all(is.na(x)))
+training <- training[!training.emptycols]
+
+training.emptycols2 <- sapply(training, function(x) sum(is.na(x)) / length(x) ) > 0.4
+training <- training[!training.emptycols2]
+
+training <- subset(training, select = -c(X, cvtd_timestamp, raw_timestamp_part_1, raw_timestamp_part_2, new_window, num_window, user_name))
+
+sapply(training, class)
+       
+```
+
+The next step is to make a training and testing dataset. The training set consists of 60% of the data and the testing set of 40%.
+
+```{r training and testing dataset}
+set.seed(54321) 
+in.training <- createDataPartition(training$classe, p = 0.6, list = FALSE)
+training.data <- training[in.training,]
+testing.data <- training[-in.training,]
+```
+
+## Model and predict
+
+For this predictive classification two models are tested: The Decision Tree and Random Forest. 
+
+The advantage of Random Forest over the Decision Tree is that there is a significantly lower risk of overfitting, because several trees are averaged. And by using multiple trees, the change of stumbling across a classifier that doesn't perform well is reduced.In most cases the Random forests have a higher accuracy as the Decision Tree. I also except that to be the case in this example.  
+
+### The Decision Tree
+
+```{r decision tree}
+
+set.seed(12345) 
+model.rpart <- rpart(classe ~ ., data = training.data)
+
+fancyRpartPlot(model.rpart, palettes = "Blues", cex = 0.6, sub = "Decision Tree")
+```
+
+```{r decision tree confusion matrix and accuracy}
+
+predict.tr.rpart <- predict(model.rpart, training.data, type = "class")
+table(training.data$classe, predict.tr.rpart)
+confusionMatrix(training.data$classe, predict.tr.rpart)$overall['Accuracy']
+
+predict.te.rpart <- predict(model.rpart, testing.data, type = "class")
+table(testing.data$classe, predict.te.rpart)
+confusionMatrix(testing.data$classe, predict.te.rpart)$overall['Accuracy']
+
+```
+
+The training data has an accuracy of 0.736. In the testing data the Decision Tree model has an even higher accuracy (0.739). 
+
+### Random Forest
+
+```{r random forest, results="hide"}
+
+set.seed(32145) 
+model.rf <- randomForest(classe ~ ., data = training.data)
+
+```
+
+```{r random forest part of model}
+head(varImp(model.rf))
+
+```
+
+```{r random forest confusion matrix and accuracy}
+
+predict.tr.rf <- predict(model.rf, training.data, type = "class")
+table(training.data$classe, predict.tr.rf)
+confusionMatrix(training.data$classe, predict.tr.rf)$overall['Accuracy']
+
+predict.te.rf <- predict(model.rf, testing.data, type = "class")
+table(testing.data$classe, predict.te.rf)
+confusionMatrix(testing.data$classe, predict.te.rf)$overall['Accuracy']
+```
+
+The accuracy of the training data has a perfect score (1). In the testing data the Random Forest model has an accuracy of 0.993. The expected Out of Sample error is 0.007.
+
+The Random Forest model has a higher accuray (0.993) as the Decision Tree model (0.739). 
+
+My prediction model to predict the manner (classe) in which six young health participants were performing one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl is the Random Forest model, because it has a higher accuracy on the testing data.
+
+## Sources
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
